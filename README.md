@@ -15,11 +15,12 @@ A ROM for Bionicle Heroes DS can be found on [BioMedia Project.](http://biomedia
 
 ## Setup:
 
-Ensure the 2 included binaries are in the PATH or the DeSmuME executable directory.
-Open DeSmuME and start Bionicle Heroes.
-Go to Tools > Lua Scripting > New Lua Script Window. From here you can browse and find the BHDS_Controller.lua script.
-Run the script if it doesn't automatically start.
+- Ensure the 2 included binaries are in the PATH or the DeSmuME executable directory.
+- Open DeSmuME and start Bionicle Heroes.
+- Go to Tools > Lua Scripting > New Lua Script Window. From here you can browse and find the BHDS_Controller.lua script.
+- Run the script if it doesn't automatically start.
 
-In Bionicle Heroes's Options menu, select "Button Config" and choose "Right-Handed (key view)" (You can choose left-handed if you want, but this is a little counter-intuitive on an Xbox controller).
-You're set! The controls are as follows:
+- In Bionicle Heroes's Options menu, select "Button Config" and choose "Right-Handed (key view)" (You can choose left-handed if you want, but this is a little counter-intuitive on an Xbox controller).
+- You're set! The controls are as follows:
+
 ![Control layout](https://imgur.com/download/ngo99ak)
