@@ -11,7 +11,7 @@ lua-xinput source can be found [here.](https://bitbucket.org/bartbes/lua-xinput/
 
 I have included binaries in this repository for ease of use.
 
-A ROM for Bionicle Heroes DS can be found on [BioMedia Project.](http://biomediaproject.com/bmp/play/retail-games/)
+A ROM for Bionicle Heroes DS can be found on [BioMedia Project.](http://biomediaproject.com/bmp/play/retail-games/bionicle-heroes/)
 
 ## Setup:
 
