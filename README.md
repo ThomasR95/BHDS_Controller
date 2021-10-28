@@ -11,7 +11,7 @@ lua-xinput source can be found [here.](https://bitbucket.org/bartbes/lua-xinput/
 
 I have included binaries in this repository for ease of use.
 
-A ROM for Bionicle Heroes DS can be found on [BioMedia Project.](http://biomediaproject.com/bmp/play/retail-games/)
+A ROM for Bionicle Heroes DS can be found on [BioMedia Project.](http://biomediaproject.com/bmp/play/retail-games/bionicle-heroes/)
 
 ## Setup:
 
@@ -23,4 +23,4 @@ A ROM for Bionicle Heroes DS can be found on [BioMedia Project.](http://biomedia
 - In Bionicle Heroes's Options menu, select "Button Config" and choose "Right-Handed (key view)" (You can choose left-handed if you want, but this is a little counter-intuitive on an Xbox controller).
 - You're set! The controls are as follows:
 
-![Control layout](https://imgur.com/download/ngo99ak)
+![Control layout](https://github.com/ThomasR95/BHDS_Controller/blob/master/controls.png?raw=true)
