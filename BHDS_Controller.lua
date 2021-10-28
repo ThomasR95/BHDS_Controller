@@ -128,7 +128,7 @@ doingHackInput = 0
 
 rStickFullLockTime = 0
 
-enableNoClip = true
+enableNoClip = false
 enableHackWithAKey = false
 showDebugText = 0
 
