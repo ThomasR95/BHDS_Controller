@@ -112,6 +112,7 @@ playerDataPosOffset = 0x000000D8
 moveDeadZone = 0.4
 locPosXValue = 0
 locPosYValue = 0
+locPosZValue = 0
 
 playerDataInputOffset = 0x000004C4
 inputFlagLoc = 0
@@ -120,6 +121,10 @@ inputFlagD=1792
 inputFlagL=1024
 inputFlagR=1280
 moveSpeed=5000
+
+fovDataOffset=0x00001178
+locFOVData=0
+fov=0
 -- 
 
 hackBtnCounter = 16
@@ -144,17 +149,27 @@ function DEC_HEX(IN)
 end
 
 -- Modifies the player's position values directly, ignoring physics
-function noclip_rightStick()
-	gui.text(0,2,"NOCLIP ENABLED (rStick)")
-	gui.text(0,26,"V to disable")
+function noclip_rightStick(joypadInput)
+
+	joypadInput.A = false
+    joypadInput.B = false
+    joypadInput.X = false
+    joypadInput.Y = false
+
+	gui.text(0,2,"NOCLIP ENABLED (rStick) - V to disable")
 	playerXPos = 1.0 * memory.readdword(locPosXValue)
 	playerYPos = 1.0 * memory.readdword(locPosYValue)
+	playerZPos = 1.0 * memory.readdword(locPosZValue)
 
 	-- make these into signed values in the dumbest hackiest way possible
 	if(playerXPos > 0x8000000) then playerXPos = (playerXPos - 0xffffffff) - 1 end
 	if(playerYPos > 0x8000000) then playerYPos = (playerYPos - 0xffffffff) - 1 end
-	gui.text(0,10,"xPos: " .. playerXPos )
-	gui.text(0,18,"yPos: " .. playerYPos )
+	if(playerZPos > 0x8000000) then playerZPos = (playerZPos - 0xffffffff) - 1 end
+
+	gui.text(0,10,"xPos " .. DEC_HEX(locPosXValue)..": " .. playerXPos )
+	gui.text(0,18,"yPos " .. DEC_HEX(locPosYValue)..": " .. playerYPos )
+	gui.text(0,26,"zPos " .. DEC_HEX(locPosZValue)..": " .. playerZPos )
+	gui.text(0,34,"FOV  " .. DEC_HEX(locFOVData)..": " .. fov )
 
     -- Movement with Left Stick
     if (math.abs(lStickX) > moveDeadZone) then
@@ -164,6 +179,26 @@ function noclip_rightStick()
     if (math.abs(lStickY) > moveDeadZone) then
 		memory.writedword(locPosYValue, playerYPos+lStickY*moveSpeed);
     end
+	
+	if btns.a then
+		memory.writedword(locPosZValue, playerZPos+moveSpeed*0.4);
+	end
+	
+	if btns.b then
+		memory.writedword(locPosZValue, playerZPos-moveSpeed*0.4);
+	end
+	
+	if btns.x then
+		fov = fov + 100
+	end
+	
+	if btns.y then
+		fov = fov - 100
+	end
+	
+	if math.abs(fov) > 65535/2 then fov = -fov end
+	
+	memory.writeword(locFOVData, fov)
 end
 
 function doHackInput()
@@ -206,8 +241,9 @@ while true do
 		locYAxisValue = locXAxisValue + 0x00000002
 		inputFlagLoc = playerDataPtr + playerDataInputOffset
 		locPosXValue = playerDataPtr + playerDataPosOffset
+		locPosZValue = locPosXValue + 4
 		locPosYValue = locPosXValue + 8
-		
+		locFOVData = playerDataPtr + fovDataOffset
 	end
 
 	-- Check joystick input from controller
@@ -297,11 +333,6 @@ while true do
 	if ingame == 1 then
 		-- Check what character we have selected
 		toaSelected = memory.readbyte(locToaSelected)
-		if not (toaSelected == lastToaSelected) then
-			scopeZoomed = false
-			scopeZoomTimeout = 0
-		end
-		lastToaSelected = toaSelected
 		for i=1,7 do
 			if selectOrder[i] == toaSelected then
 				toaSelectIdx = i
@@ -351,6 +382,7 @@ while true do
 			actualLookSpeed = actualLookSpeed * (1.0+math.min(rStickFullLockTime*rStickFullLockAcceleration, 1.5))
 		end
 		
+		scopeZoomed = memory.readword(locFOVData) > 4000
 		if scopeZoomed then
 			actualLookSpeed = actualLookSpeed * 0.3
 		end
@@ -415,55 +447,22 @@ while true do
         joypadInput.L = true
     end
 
-	-- Freeze the LTrigger value to allow time for the scope animation
-	if scopeZoomTimeout > 0 then
-		scopeZoomTimeout = scopeZoomTimeout - 1
-		lTrig = frozenLTrigVal
-	end
-
     -- Action with LT
-    if (lTrig > 0.2) then
-		if toaSelected == 4 then
-		-- Special case for matoro's scope - hold to zoom
-			if not leftTrigHeldLastFrame then
-				scopeZoomed = not scopeZoomed
-				joypadInput.R = true
-				scopeBtnTimeout = 3
-				scopeZoomTimeout = 50
-				frozenLTrigVal = lTrig
-			elseif scopeBtnTimeout > 0 then
-				scopeBtnTimeout = scopeBtnTimeout - 1
-				joypadInput.R = true
-			else
-				joypadInput.R = false
-			end
-		else
-			joypadInput.R = true
-		end
-		leftTrigHeldLastFrame = true
-	else	
-		if toaSelected == 4 and leftTrigHeldLastFrame and scopeZoomed then
-		-- Undo scope on release
-			scopeZoomed = false
-			joypadInput.R = true
-			scopeBtnTimeout = -3
-			scopeZoomTimeout = 50
-			frozenLTrigVal = lTrig
-		elseif scopeBtnTimeout < 0 then
-			scopeBtnTimeout = scopeBtnTimeout + 1
-			joypadInput.R = true
-		end
-		leftTrigHeldLastFrame = false
-    end
-	
-	
+	if (lTrig > 0.2) then
+		joypadInput.R = true
+	end
+		
 	-- hacky bits
 	if enableHackWithAKey then doHackInput() end
-	if enableNoClip then noclip_rightStick() end
+	if enableNoClip and ingame == 1 then noclip_rightStick(joypadInput) end
 	keys = input.get()
 	if clicktimeout == 0 then
 	if keys.V then 
 		enableNoClip = not enableNoClip
+		fov = memory.readword(locFOVData)
+		if enableNoClip == false and fov > 65535/2 then
+			memory.writeword(locFOVData, 1)
+		end
 		clicktimeout = 10
 	end
 	if keys.D then 
