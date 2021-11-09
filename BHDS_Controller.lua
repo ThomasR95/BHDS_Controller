@@ -78,6 +78,8 @@ ingame = 1
 -- memory locations for the player data
 -- This location is constant, and its value points close to the actual location of the player data which moves
 locPlayerDataPtr = 0x020E40F0
+locPlayerDataPtr2offset = 0x00000498
+locPlayerDataPtr2 = 0
 -- The offset of the player's X view axis value, from the aforementioned pointer
 playerDataLookOffset = 0x00000454
 locXAxisValue=0
@@ -114,7 +116,7 @@ locPosXValue = 0
 locPosYValue = 0
 locPosZValue = 0
 
-playerDataInputOffset = 0x000004C4
+playerDataInputOffset = 0x00000C0C
 inputFlagLoc = 0
 inputFlagU=256
 inputFlagD=1792
@@ -122,7 +124,8 @@ inputFlagL=1024
 inputFlagR=1280
 moveSpeed=5000
 
-fovDataOffset=0x00001178
+-- fov offset from playerdataptr 2
+fovDataOffset=0x00000390
 locFOVData=0
 fov=0
 -- 
@@ -236,14 +239,14 @@ while true do
 	elseif locXAxisValue == 0 then
 		-- Use the pointer to the Player Data location to find the location of the axis values
 		playerDataPtr = memory.readdword(locPlayerDataPtr)
-		--playerData2Ptr = memory.readdword(locPlayerData2Ptr)
+		playerDataPtr2 = memory.readdword(playerDataPtr + locPlayerDataPtr2offset)
 		locXAxisValue = playerDataPtr + playerDataLookOffset
 		locYAxisValue = locXAxisValue + 0x00000002
 		inputFlagLoc = playerDataPtr + playerDataInputOffset
 		locPosXValue = playerDataPtr + playerDataPosOffset
 		locPosZValue = locPosXValue + 4
 		locPosYValue = locPosXValue + 8
-		locFOVData = playerDataPtr + fovDataOffset
+		locFOVData = playerDataPtr2 + fovDataOffset
 	end
 
 	-- Check joystick input from controller
@@ -416,11 +419,12 @@ while true do
 		-- for debugging
 		if showDebugText == 1 then
 			gui.text(0,2,"data: " .. DEC_HEX(playerDataPtr) )
-			gui.text(0,10,"toa: " .. toaSelected .. " idx: " .. toaSelectIdx)
-			gui.text(0,18,"scope: " .. tostring(scopeZoomed) )
+			gui.text(0,10,"data2: " .. DEC_HEX(playerDataPtr2) )
+			gui.text(0,18,"toa: " .. toaSelected .. " idx: " .. toaSelectIdx)
 		elseif showDebugText == 2 then
 			gui.text(0,2,"X: " .. DEC_HEX(locXAxisValue) .. ": " .. xAxis)
 			gui.text(0,10,"Y: " .. DEC_HEX(locYAxisValue) .. ": " .. yAxis)
+			gui.text(0,18,"scope: " .. tostring(scopeZoomed) )
 		elseif showDebugText == 3 then
 			gui.text(0,2,"mag: " .. moveMagnitude )
 			gui.text(0,10,"lookspeed: " .. actualLookSpeed )
