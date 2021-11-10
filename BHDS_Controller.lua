@@ -116,13 +116,13 @@ locPosXValue = 0
 locPosYValue = 0
 locPosZValue = 0
 
-playerDataInputOffset = 0x00000C0C
-inputFlagLoc = 0
-inputFlagU=256
-inputFlagD=1792
-inputFlagL=1024
-inputFlagR=1280
-moveSpeed=5000
+playerDataVelOffset = 0x00000074
+playerDataMoveFlagOffset = 0x000000FC
+xAngle = 0
+locXVel = 0
+locYVel = 0
+locMoveFlag = 0
+walkSpeed = 10240
 
 -- fov offset from playerdataptr 2
 fovDataOffset=0x00000390
@@ -137,8 +137,12 @@ doingHackInput = 0
 rStickFullLockTime = 0
 
 enableNoClip = false
+moveSpeed = 5000
 enableHackWithAKey = false
 showDebugText = 0
+
+sprintFOV = false
+playerMoving = false
 
 -- This is a function that helps print the decimal values as hexadecimals
 function DEC_HEX(IN)
@@ -149,6 +153,15 @@ function DEC_HEX(IN)
         OUT=string.sub(K,D,D)..OUT
     end
     return OUT
+end
+
+function RotateVector(inX, inY, angle)
+	local outX = math.cos(angle)*inX - math.sin(angle)*inY
+	local outY = math.sin(angle)*inX + math.cos(angle)*inY
+	local outPair = {0,0}
+	outPair[1] = outX
+	outPair[2] = outY
+	return outPair
 end
 
 -- Modifies the player's position values directly, ignoring physics
@@ -174,13 +187,19 @@ function noclip_rightStick(joypadInput)
 	gui.text(0,26,"zPos " .. DEC_HEX(locPosZValue)..": " .. playerZPos )
 	gui.text(0,34,"FOV  " .. DEC_HEX(locFOVData)..": " .. fov )
 
-    -- Movement with Left Stick
-    if (math.abs(lStickX) > moveDeadZone) then
-		memory.writedword(locPosXValue, playerXPos+lStickX*moveSpeed);
-    end
+	local xAxis = memory.readword(locXAxisValue)
+	local yAxis = memory.readword(locYAxisValue)
+	-- calculate this angle in radians for future use
+	xAngle = ((2*math.pi) * xAxis) / 65535.0
+		
+	rotatedVel = RotateVector(math.pow(lStickX, viewCurve), math.pow(lStickY, viewCurve), xAngle)
+	rotatedVel[1] = -rotatedVel[1] * walkSpeed;
+	rotatedVel[2] = rotatedVel[2] * walkSpeed;
 
-    if (math.abs(lStickY) > moveDeadZone) then
-		memory.writedword(locPosYValue, playerYPos+lStickY*moveSpeed);
+    -- Movement with Left Stick
+    if (math.abs(lStickX) > moveDeadZone) or (math.abs(lStickY) > moveDeadZone) then
+		memory.writedword(locPosXValue, playerXPos+rotatedVel[1]);
+		memory.writedword(locPosYValue, playerYPos+rotatedVel[2]);
     end
 	
 	if btns.a then
@@ -191,6 +210,10 @@ function noclip_rightStick(joypadInput)
 		memory.writedword(locPosZValue, playerZPos-moveSpeed*0.4);
 	end
 	
+	if math.abs(fov) > 65535/2 then 
+		fov = -fov 
+	end
+	
 	if btns.x then
 		fov = fov + 100
 	end
@@ -199,9 +222,8 @@ function noclip_rightStick(joypadInput)
 		fov = fov - 100
 	end
 	
-	if math.abs(fov) > 65535/2 then fov = -fov end
-	
 	memory.writeword(locFOVData, fov)
+
 end
 
 function doHackInput()
@@ -242,10 +264,12 @@ while true do
 		playerDataPtr2 = memory.readdword(playerDataPtr + locPlayerDataPtr2offset)
 		locXAxisValue = playerDataPtr + playerDataLookOffset
 		locYAxisValue = locXAxisValue + 0x00000002
-		inputFlagLoc = playerDataPtr + playerDataInputOffset
 		locPosXValue = playerDataPtr + playerDataPosOffset
 		locPosZValue = locPosXValue + 4
 		locPosYValue = locPosXValue + 8
+		locXVel = playerDataPtr + playerDataVelOffset
+		locYVel = locXVel + 8
+		locMoveFlag = playerDataPtr + playerDataMoveFlagOffset
 		locFOVData = playerDataPtr2 + fovDataOffset
 	end
 
@@ -333,7 +357,7 @@ while true do
 		heroClick = heroClick - 1
     end
     
-	if ingame == 1 then
+	if ingame == 1 then ------------------------------------ BEGIN IN-GAME CONTROLS -------------------------
 		-- Check what character we have selected
 		toaSelected = memory.readbyte(locToaSelected)
 		for i=1,7 do
@@ -370,12 +394,14 @@ while true do
 		
 		local xAxis = memory.readword(locXAxisValue)
 		local yAxis = memory.readword(locYAxisValue)
+		-- calculate this angle in radians for future use
+		xAngle = ((2*math.pi) * xAxis) / 65535.0
 		
-		local moveMagnitude = math.sqrt(rStickX*rStickX + rStickY*rStickY)
+		local lookMagnitude = math.sqrt(rStickX*rStickX + rStickY*rStickY)
 		
 		local actualLookSpeed = lookSpeed
 		
-		if moveMagnitude > rStickFullLockThreshold then
+		if lookMagnitude > rStickFullLockThreshold then
 			rStickFullLockTime = rStickFullLockTime + 1
 		else
 			rStickFullLockTime = 0
@@ -385,17 +411,18 @@ while true do
 			actualLookSpeed = actualLookSpeed * (1.0+math.min(rStickFullLockTime*rStickFullLockAcceleration, 1.5))
 		end
 		
-		scopeZoomed = memory.readword(locFOVData) > 4000
+		local fovScopeCheck = memory.readword(locFOVData)
+		scopeZoomed = fovScopeCheck > 4000 and fovScopeCheck < 65535/2
 		if scopeZoomed then
 			actualLookSpeed = actualLookSpeed * 0.3
 		end
 		
-		local xVel = math.pow(rStickX, viewCurve)*actualLookSpeed
-		local yVel = math.pow(rStickY, viewCurve)*actualLookSpeed
+		local xLookVel = math.pow(rStickX, viewCurve)*actualLookSpeed
+		local yLookVel = math.pow(rStickY, viewCurve)*actualLookSpeed
 		
-		if (moveMagnitude > viewDeadZone) then
-			xAxis = xAxis - xVel
-			yAxis = yAxis - yVel
+		if (lookMagnitude > viewDeadZone) then
+			xAxis = xAxis - xLookVel
+			yAxis = yAxis - yLookVel
 		end
 		
 		-- Wrap the axis values
@@ -404,6 +431,7 @@ while true do
 		elseif xAxis > 65535 then
 			xAxis = xAxis - 65535
 		end
+
 		
 		if yAxis < 0 then
 			yAxis = yAxis + 65535
@@ -413,9 +441,7 @@ while true do
 		
 		memory.writeword(locXAxisValue, xAxis)
 		memory.writeword(locYAxisValue, yAxis)
-		
-		--local  inputFlag = memory.readbyte(inputFlagLoc+0x1)
-		
+				
 		-- for debugging
 		if showDebugText == 1 then
 			gui.text(0,2,"data: " .. DEC_HEX(playerDataPtr) )
@@ -424,15 +450,49 @@ while true do
 		elseif showDebugText == 2 then
 			gui.text(0,2,"X: " .. DEC_HEX(locXAxisValue) .. ": " .. xAxis)
 			gui.text(0,10,"Y: " .. DEC_HEX(locYAxisValue) .. ": " .. yAxis)
-			gui.text(0,18,"scope: " .. tostring(scopeZoomed) )
+			gui.text(0,18,"scope: " .. tostring(scopeZoomed) .. " (" .. fov .. ")" )
 		elseif showDebugText == 3 then
-			gui.text(0,2,"mag: " .. moveMagnitude )
 			gui.text(0,10,"lookspeed: " .. actualLookSpeed )
+			gui.text(0,18,"vel - " .. DEC_HEX(locXVel) .. " : [" .. memory.readdword(locXVel) .. "," .. memory.readdword(locYVel) .. "]" )
 		end
-	end
-
-    -- Movement with Left Stick
-	if not enableNoClip then
+		
+		
+		sprintFOV = false
+		playerMoving = false
+		-- Movement with Left Stick
+		if not enableNoClip then
+		
+			local moveMagnitude = math.sqrt(lStickX*lStickX + lStickY*lStickY)
+			
+			if moveMagnitude > moveDeadZone then
+				playerMoving = true
+				local speedMult = 1.2
+				
+				-- sprint with rightShoulder
+				if btns.rightShoulder and lStickY > 0 then
+					speedMult = 1.8
+					
+					local tempFOV = memory.readword(locFOVData)
+					if not scopeZoomed then 
+						sprintFOV = true 
+					end
+				end
+				
+				rotatedVel = RotateVector(math.pow(lStickX, viewCurve), math.pow(lStickY, viewCurve), xAngle)
+				rotatedVel[1] = -rotatedVel[1] * walkSpeed * speedMult;
+				rotatedVel[2] = rotatedVel[2] * walkSpeed * speedMult;
+				--gui.text(0,2,"Stick tilt: [" .. lStickX .. "," .. lStickY )
+				--gui.text(0,10,"forward angle: ".. xAngle )
+				--gui.text(0,18,"Walk velocity: [" .. rotatedVel[1] .. "," .. rotatedVel[2] )
+				
+				if sprintFOV and fov > -1000 then
+					fov = fov - 100
+				end
+			end	
+		end
+		
+	else --------------------------------------- END IN-GAME CONTROLS ------------------------------------------------------------------------
+	-- just translate left stick to dpad input
 		if (lStickX > moveDeadZone) then
 			joypadInput.right = true
 		elseif (lStickX < 0-moveDeadZone) then
@@ -454,6 +514,10 @@ while true do
     -- Action with LT
 	if (lTrig > 0.2) then
 		joypadInput.R = true
+		if toaSelected == 4 and not scopeZoomed then
+			fov = 0
+			memory.writeword(locFOVData, 0)
+		end
 	end
 		
 	-- hacky bits
@@ -461,32 +525,52 @@ while true do
 	if enableNoClip and ingame == 1 then noclip_rightStick(joypadInput) end
 	keys = input.get()
 	if clicktimeout == 0 then
-	if keys.V then 
-		enableNoClip = not enableNoClip
-		fov = memory.readword(locFOVData)
-		if enableNoClip == false and fov > 65535/2 then
-			memory.writeword(locFOVData, 1)
+		if keys.V then 
+			enableNoClip = not enableNoClip
+			fov = memory.readword(locFOVData)
+			if enableNoClip == false and fov > 65535/2 then
+				memory.writeword(locFOVData, 1)
+			end
+			clicktimeout = 10
 		end
-		clicktimeout = 10
+		if keys.D then 
+			showDebugText = showDebugText + 1; if showDebugText > 3 then showDebugText = 0 end
+			clicktimeout = 10
+		end
 	end
-	if keys.D then 
-		showDebugText = showDebugText + 1; if showDebugText > 3 then showDebugText = 0 end
-		clicktimeout = 10
+	
+	-- manually move fov back to 0 from negative otherwise the game loops it around the wrong way
+	if (fov >= 35565 or fov < 1) and not sprintFOV then
+		fov = fov + 100
 	end
+	if fov >= -100 and fov < 0 and ingame == 1 and not sprintFOV and not scopeZoomed then
+		memory.writeword(locFOVData, 1)
+		fov = 0
 	end
     
+	if clicktimeout > 0 then clicktimeout = clicktimeout - 1 end
+
     -- Submit the input to the emulator
     joypad.set(joypadInput)
 
 	if ingame == 1 then
+		
 		-- Draw an indicator for where the simulated stylus is
 		if stylusInput.touch then 
 			stylus.set(stylusInput)
-			gui.box(stylusInput.x-3, stylusInput.y-3, stylusInput.x+3, stylusInput.y+3, 0xffff00ff) 
+			gui.box(stylusInput.x-3, stylusInput.y-3, stylusInput.x+3, stylusInput.y+3, 0xffcc00ff) 
+		end
+	
+		if fov < 0 then
+			memory.writeword(locFOVData, fov)
+		end
+		
+		if playerMoving and not enableNoClip then
+			memory.writebyte(locMoveFlag, 1)
+			memory.writedword(locXVel, rotatedVel[1])
+			memory.writedword(locYVel, rotatedVel[2])
 		end
 	end
 	
-	if clicktimeout > 0 then clicktimeout = clicktimeout - 1 end
-
 	emu.frameadvance()
 end
