@@ -118,10 +118,13 @@ locPosZValue = 0
 
 playerDataVelOffset = 0x00000074
 playerDataMoveFlagOffset = 0x000000FC
+playerDataMoveFlag2Offset = 0x00000E54
+locMoveInputFlag = 0x020e094c
 xAngle = 0
 locXVel = 0
 locYVel = 0
 locMoveFlag = 0
+locMoveFlag2 = 0
 walkSpeed = 10240
 
 -- fov offset from playerdataptr 2
@@ -270,6 +273,7 @@ while true do
 		locXVel = playerDataPtr + playerDataVelOffset
 		locYVel = locXVel + 8
 		locMoveFlag = playerDataPtr + playerDataMoveFlagOffset
+		locMoveFlag2 = playerDataPtr + playerDataMoveFlag2Offset
 		locFOVData = playerDataPtr2 + fovDataOffset
 	end
 
@@ -450,7 +454,7 @@ while true do
 		elseif showDebugText == 2 then
 			gui.text(0,2,"X: " .. DEC_HEX(locXAxisValue) .. ": " .. xAxis)
 			gui.text(0,10,"Y: " .. DEC_HEX(locYAxisValue) .. ": " .. yAxis)
-			gui.text(0,18,"scope: " .. tostring(scopeZoomed) .. " (" .. fov .. ")" )
+			gui.text(0,18,"scope: " .. tostring(scopeZoomed) .. " (" .. memory.readword(locFOVData) .. ")" )
 		elseif showDebugText == 3 then
 			gui.text(0,10,"lookspeed: " .. actualLookSpeed )
 			gui.text(0,18,"vel - " .. DEC_HEX(locXVel) .. " : [" .. memory.readdword(locXVel) .. "," .. memory.readdword(locYVel) .. "]" )
@@ -466,7 +470,7 @@ while true do
 			
 			if moveMagnitude > moveDeadZone then
 				playerMoving = true
-				local speedMult = 1.2
+				local speedMult = 1.0
 				
 				-- sprint with rightShoulder
 				if btns.rightShoulder and lStickY > 0 then
@@ -553,8 +557,7 @@ while true do
     -- Submit the input to the emulator
     joypad.set(joypadInput)
 
-	if ingame == 1 then
-		
+	if ingame == 1 then		
 		-- Draw an indicator for where the simulated stylus is
 		if stylusInput.touch then 
 			stylus.set(stylusInput)
@@ -566,7 +569,11 @@ while true do
 		end
 		
 		if playerMoving and not enableNoClip then
-			memory.writebyte(locMoveFlag, 1)
+			-- Trick the game into thinking there's controller input,
+			-- otherwise it won't allow us to move
+			memory.writebyte(locMoveInputFlag, 128)
+			
+			-- Set the player's velocity values
 			memory.writedword(locXVel, rotatedVel[1])
 			memory.writedword(locYVel, rotatedVel[2])
 		end
