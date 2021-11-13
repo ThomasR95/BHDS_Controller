@@ -2,6 +2,10 @@
 
 A lua script for DeSmuME to convert XBOX Controller input into a format understood by the game.
 
+## NOTE:
+**In order for this branch to work successfully, you should enable Advanced Bus-Level Timing in DeSmuME's emulation settings:**
+![Advanced_bus_level_timing](https://raw.githubusercontent.com/ThomasR95/BHDS_Controller/analog-player-movement/advanced-bus-level-timing.png)
+
 ## Prerequisites:
 
 In order for this script to run, you need to have lua51.dll and lua-xinput.dll in your PATH or the DeSmuME executable's directory.
